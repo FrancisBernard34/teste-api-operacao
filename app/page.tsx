@@ -96,6 +96,38 @@ export default function Home() {
     }
   };
 
+  const testWebhook = async () => {
+    try {
+      const testData = {
+        message: "Test webhook data",
+        timestamp: new Date().toISOString(),
+        test: true,
+        data: {
+          result: "This is a test webhook response",
+          status: "success"
+        }
+      };
+
+      const response = await fetch('/api/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(testData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Test webhook sent successfully:', result);
+        // The polling will automatically pick up this webhook data
+      } else {
+        console.error('Failed to send test webhook:', response.statusText);
+      }
+    } catch (err) {
+      console.error('Error sending test webhook:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
@@ -104,12 +136,12 @@ export default function Home() {
             API Operation Test
           </h1>
           <p className="text-gray-600">
-            Click the button to trigger the API call and wait for webhook response
+            Click "Call API" to trigger the external API call, or "Test WebHook" to simulate a webhook response
           </p>
         </div>
 
         {/* API Call Button */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 space-y-4">
           <button
             onClick={callApi}
             disabled={loading}
@@ -120,6 +152,20 @@ export default function Home() {
             }`}
           >
             {loading ? 'Calling API...' : 'Call API'}
+          </button>
+          
+          <div className="text-sm text-gray-500">or</div>
+          
+          <button
+            onClick={testWebhook}
+            disabled={loading}
+            className={`px-6 py-3 rounded-lg text-white font-medium transition-colors ${
+              loading
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
+            }`}
+          >
+            Test WebHook
           </button>
         </div>
 
