@@ -69,6 +69,9 @@ export default function Home() {
 
     try {
       const targetHost = process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000';
+      const webhookUrl = `${targetHost}/api/webhook`;
+      
+      console.log('Sending request with targetHost:', webhookUrl);
       
       const apiResponse = await fetch(
         'https://webhook.operacaocodigodeouro.com.br/webhook/interview_expert?email=francisbernardcontato@gmail.com',
@@ -76,7 +79,7 @@ export default function Home() {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer OP_HACKATHON_2025',
-            'targetHost': `${targetHost}/api/webhook`
+            'targetHost': webhookUrl
           }
         }
       );
@@ -98,18 +101,52 @@ export default function Home() {
     }
   };
 
+  // Test webhook endpoint
+  const testWebhook = async () => {
+    try {
+      const targetHost = process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000';
+      const testResponse = await fetch(`${window.location.protocol}//${targetHost}/api/webhook`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          test: true,
+          message: 'This is a test webhook response',
+          timestamp: new Date().toISOString()
+        })
+      });
+      
+      const result = await testResponse.json();
+      console.log('Test webhook result:', result);
+      alert('Test webhook sent! Check the AI Processing Response section.');
+    } catch (error) {
+      console.error('Test webhook error:', error);
+      alert('Test webhook failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
   return (
     <div className="min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
         <h1 className="text-2xl font-bold">API Test Interface</h1>
         
-        <button
-          onClick={callAPI}
-          disabled={loading}
-          className="bg-blue-500 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
-        >
-          {loading ? 'Sending Request...' : 'Send API Request'}
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={callAPI}
+            disabled={loading}
+            className="bg-blue-500 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
+          >
+            {loading ? 'Sending Request...' : 'Send API Request'}
+          </button>
+          
+          <button
+            onClick={testWebhook}
+            className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors"
+          >
+            Test Webhook
+          </button>
+        </div>
 
         {/* Immediate API Response - Small Space */}
         <div className="w-full max-w-4xl">
