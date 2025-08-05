@@ -68,13 +68,15 @@ export default function Home() {
     setResponse('');
 
     try {
+      const targetHost = process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000';
+      
       const apiResponse = await fetch(
         'https://webhook.operacaocodigodeouro.com.br/webhook/interview_expert?email=francisbernardcontato@gmail.com',
         {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer OP_HACKATHON_2025',
-            'targetHost': 'localhost:3000/api/webhook'
+            'targetHost': `${targetHost}/api/webhook`
           }
         }
       );
@@ -159,6 +161,18 @@ export default function Home() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Status Information */}
+        <div className="w-full max-w-4xl text-sm text-gray-600">
+          <p><strong>How it works:</strong></p>
+          <ul className="list-disc list-inside mt-2 space-y-1">
+            <li>Click the button to send a request to the AI processing API</li>
+            <li>The API will process your request asynchronously</li>
+            <li>The AI response will be delivered to <code className="bg-gray-200 px-1 rounded">{process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000'}/api/webhook</code></li>
+            <li>This page polls for new responses every 2 seconds</li>
+            <li>The response will appear in the "AI Processing Response" section above</li>
+          </ul>
         </div>
       </main>
     </div>
