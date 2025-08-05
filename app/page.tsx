@@ -104,8 +104,8 @@ export default function Home() {
   // Test webhook endpoint
   const testWebhook = async () => {
     try {
-      const targetHost = process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000';
-      const testResponse = await fetch(`${window.location.protocol}//${targetHost}/api/webhook`, {
+      // For testing, use the current origin (same domain) to avoid CORS issues
+      const testResponse = await fetch('/api/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
