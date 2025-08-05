@@ -67,7 +67,8 @@ export default function Home() {
           'Authorization': 'Bearer OP_HACKATHON_2025',
           'targetHost': `${process.env.NEXT_PUBLIC_TARGET_HOST}/api/webhook`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ "message": { "text": "Olá, tudo bem?" } })
       });
 
       if (response.ok) {
