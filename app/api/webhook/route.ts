@@ -1,95 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { setWebhookResponse } from '@/app/lib/webhookState';
-
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, targetHost',
-};
-
-export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: corsHeaders,
-  });
-}
+import { webhookStore } from '../../lib/webhook-store';
 
 export async function POST(request: NextRequest) {
   try {
-    // Handle different content types
-    const contentType = request.headers.get('content-type');
-    let body: any;
+    // Get the request body
+    const body = await request.json();
     
-    if (contentType?.includes('application/json')) {
-      body = await request.json();
-      body = JSON.stringify(body, null, 2); // Pretty format JSON
-    } else {
-      body = await request.text();
-    }
+    // Store the webhook data
+    const webhookData = {
+      id: Date.now().toString(),
+      data: body,
+      timestamp: new Date().toISOString()
+    };
     
-    setWebhookResponse(body);
-    
-    console.log('Webhook POST received:', {
-      contentType,
-      headers: Object.fromEntries(request.headers.entries()),
-      body: body
-    });
-    
-    return NextResponse.json({ 
-      success: true, 
-      received: true,
-      message: 'Webhook received successfully'
-    }, {
-      status: 200,
-      headers: corsHeaders,
-    });
-  } catch (error) {
-    console.error('Error processing webhook POST:', error);
-    return NextResponse.json({ 
-      error: 'Failed to process webhook',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { 
-      status: 500,
-      headers: corsHeaders,
-    });
-  }
-}
+    webhookStore.setWebhookData(webhookData);
 
-export async function GET(request: NextRequest) {
-  try {
-    const url = new URL(request.url);
-    const queryParams = url.searchParams.toString();
-    
-    if (queryParams) {
-      setWebhookResponse(`GET request with params: ${queryParams}`);
-      console.log('Webhook GET received with params:', queryParams);
-    } else {
-      console.log('Webhook GET received (health check)');
-      return NextResponse.json({ 
-        status: 'healthy',
-        message: 'Webhook endpoint is ready to receive POST requests'
-      }, {
-        status: 200,
-        headers: corsHeaders,
-      });
-    }
-    
-    return NextResponse.json({ 
-      success: true, 
-      received: true 
-    }, {
-      status: 200,
-      headers: corsHeaders,
+    console.log('Webhook received:', {
+      timestamp: webhookData.timestamp,
+      data: body
     });
+
+    // Return success response
+    return NextResponse.json({
+      success: true,
+      message: 'Webhook received successfully',
+      id: webhookData.id
+    }, { status: 200 });
+
   } catch (error) {
-    console.error('Error processing webhook GET:', error);
-    return NextResponse.json({ 
-      error: 'Failed to process webhook',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { 
-      status: 500,
-      headers: corsHeaders,
-    });
+    console.error('Webhook error:', error);
+    
+    return NextResponse.json({
+      success: false,
+      message: 'Failed to process webhook',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

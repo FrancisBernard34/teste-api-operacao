@@ -1,20 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getWebhookResponse } from '@/app/lib/webhookState';
+import { NextResponse } from 'next/server';
+import { webhookStore } from '../../lib/webhook-store';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const state = getWebhookResponse();
+    const latestWebhook = webhookStore.getLatestWebhook();
     
     return NextResponse.json({
-      hasResponse: !!state.latestResponse,
-      response: state.latestResponse,
-      timestamp: state.responseTimestamp
+      success: true,
+      latestWebhook: latestWebhook
     });
   } catch (error) {
     console.error('Error getting webhook status:', error);
-    return NextResponse.json({ 
-      hasResponse: false,
-      error: 'Failed to get webhook status'
+    
+    return NextResponse.json({
+      success: false,
+      message: 'Failed to get webhook status',
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }

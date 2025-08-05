@@ -2,192 +2,191 @@
 
 import { useState, useEffect } from 'react';
 
+interface ApiResponse {
+  success: boolean;
+  message?: string;
+  data?: any;
+  timestamp?: string;
+}
+
+interface WebhookData {
+  id: string;
+  data: any;
+  timestamp: string;
+}
+
 export default function Home() {
-  const [response, setResponse] = useState<string>('');
-  const [webhookResponse, setWebhookResponse] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
-  const [webhookLoading, setWebhookLoading] = useState<boolean>(false);
+  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
+  const [webhookData, setWebhookData] = useState<WebhookData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
-  // Check for new webhook responses every few seconds
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (webhookLoading) {
-      interval = setInterval(async () => {
-        try {
-          const response = await fetch('/api/webhook-status');
-          const data = await response.json();
-          
-          if (data.hasResponse) {
-            setWebhookResponse(data.response);
-            setWebhookLoading(false);
-          }
-        } catch (error) {
-          console.error('Error checking webhook status:', error);
-        }
-      }, 2000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [webhookLoading]);
-
-  const callAPI = async () => {
-    setLoading(true);
-    setError('');
-    setResponse('');
-    setWebhookResponse('');
-
+  // Polling function to check for webhook responses
+  const pollWebhookData = async () => {
     try {
-      // Clear any previous webhook response
-      await fetch('/api/webhook-clear', { method: 'POST' });
-      
-      const targetHost = process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000';
-      const webhookUrl = `${targetHost}/api/webhook`;
-      
-      console.log('Sending request with targetHost:', webhookUrl);
-      
-      const apiResponse = await fetch(
-        'https://webhook.operacaocodigodeouro.com.br/webhook/interview_expert?email=francisbernardcontato@gmail.com',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer OP_HACKATHON_2025',
-            'targetHost': webhookUrl
-          }
+      const response = await fetch('/api/webhook-status');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.latestWebhook) {
+          setWebhookData(data.latestWebhook);
+          setIsPolling(false); // Stop polling once we receive the webhook
         }
-      );
-
-      if (!apiResponse.ok) {
-        throw new Error(`HTTP error! status: ${apiResponse.status}`);
       }
-
-      const data = await apiResponse.text();
-      setResponse(data);
-      
-      // Start waiting for webhook response
-      setWebhookLoading(true);
-      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Polling error:', err);
+    }
+  };
+
+  // Start/stop polling based on isPolling state
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isPolling) {
+      interval = setInterval(pollWebhookData, 2000); // Poll every 2 seconds
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isPolling]);
+
+  const callApi = async () => {
+    setLoading(true);
+    setError(null);
+    setApiResponse(null);
+    setWebhookData(null);
+    setIsPolling(false);
+    
+    try {
+      const response = await fetch('https://webhook.operacaocodigodeouro.com.br/webhook/interview_expert?email=francisbernardcontato@gmail.com', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer OP_HACKATHON_2025',
+          'targetHost': `${process.env.NEXT_PUBLIC_TARGET_HOST}/api/webhook`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setApiResponse({
+          success: true,
+          message: 'API call successful',
+          data: data,
+          timestamp: new Date().toISOString()
+        });
+        // Start polling for webhook response after successful API call
+        setIsPolling(true);
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      setApiResponse({
+        success: false,
+        message: errorMessage,
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Test webhook endpoint
-  const testWebhook = async () => {
-    try {
-      // For testing, use the current origin (same domain) to avoid CORS issues
-      const testResponse = await fetch('/api/webhook', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          test: true,
-          message: 'This is a test webhook response',
-          timestamp: new Date().toISOString()
-        })
-      });
-      
-      const result = await testResponse.json();
-      console.log('Test webhook result:', result);
-      alert('Test webhook sent! Check the AI Processing Response section.');
-    } catch (error) {
-      console.error('Test webhook error:', error);
-      alert('Test webhook failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  };
-
   return (
-    <div className="min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <h1 className="text-2xl font-bold">API Test Interface</h1>
-        
-        <div className="flex gap-4">
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            API Operation Test
+          </h1>
+          <p className="text-gray-600">
+            Click the button to trigger the API call and wait for webhook response
+          </p>
+        </div>
+
+        {/* API Call Button */}
+        <div className="text-center mb-8">
           <button
-            onClick={callAPI}
+            onClick={callApi}
             disabled={loading}
-            className="bg-blue-500 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition-colors"
+            className={`px-6 py-3 rounded-lg text-white font-medium transition-colors ${
+              loading
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+            }`}
           >
-            {loading ? 'Sending Request...' : 'Send API Request'}
-          </button>
-          
-          <button
-            onClick={testWebhook}
-            className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors"
-          >
-            Test Webhook
+            {loading ? 'Calling API...' : 'Call API'}
           </button>
         </div>
 
-        {/* Immediate API Response - Small Space */}
-        <div className="w-full max-w-4xl">
-          <h3 className="text-md font-semibold mb-2">Immediate Response:</h3>
-          
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-2 text-sm">
-              <strong>Error:</strong> {error}
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <h3 className="text-red-800 font-medium mb-2">Error</h3>
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Immediate API Response */}
+        {apiResponse && (
+          <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Immediate API Response</h3>
+            <div className={`p-3 rounded ${apiResponse.success ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className="flex items-center mb-2">
+                <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                  apiResponse.success ? 'bg-green-500' : 'bg-red-500'
+                }`}></span>
+                <span className="font-medium">
+                  {apiResponse.success ? 'Success' : 'Failed'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">{apiResponse.message}</p>
+              {apiResponse.data && (
+                <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+                  {JSON.stringify(apiResponse.data, null, 2)}
+                </pre>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                {new Date(apiResponse.timestamp!).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Webhook Response */}
+        <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Webhook Response</h3>
+          {webhookData ? (
+            <div className="p-3 bg-blue-50 rounded">
+              <div className="flex items-center mb-2">
+                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                <span className="font-medium">Webhook Received</span>
+              </div>
+              <pre className="text-xs bg-white p-2 rounded overflow-x-auto mb-2">
+                {JSON.stringify(webhookData.data, null, 2)}
+              </pre>
+              <p className="text-xs text-gray-500">
+                Received: {new Date(webhookData.timestamp).toLocaleString()}
+              </p>
+            </div>
+          ) : isPolling ? (
+            <div className="p-3 bg-gray-50 rounded text-center">
+              <p className="text-gray-500">Waiting for webhook response...</p>
+              <div className="mt-2">
+                <div className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-gray-50 rounded text-center">
+              <p className="text-gray-500">Click "Call API" to start monitoring for webhook responses</p>
             </div>
           )}
-          
-          <div className="border border-gray-300 rounded p-2 h-[50px] bg-gray-50 text-sm overflow-auto">
-            {loading ? (
-              <span className="text-gray-500 italic">Sending request...</span>
-            ) : response ? (
-              <span className="text-green-600">{response}</span>
-            ) : (
-              <span className="text-gray-500 italic">No immediate response yet</span>
-            )}
-          </div>
         </div>
-
-        {/* Webhook Response - Large Space */}
-        <div className="w-full max-w-4xl">
-          <h2 className="text-lg font-semibold mb-4">AI Processing Response:</h2>
-          
-          <div className="border border-gray-300 rounded-lg p-4 min-h-[400px] bg-gray-50">
-            {webhookLoading ? (
-              <div className="flex flex-col items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-4"></div>
-                <p className="text-gray-600">Waiting for AI to process your request...</p>
-                <p className="text-sm text-gray-500 mt-2">This may take a few moments</p>
-              </div>
-            ) : webhookResponse ? (
-              <div>
-                <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded mb-4 text-sm">
-                  ✅ Response received from AI processing
-                </div>
-                <pre className="whitespace-pre-wrap text-sm bg-white p-4 rounded border overflow-auto max-h-96">
-                  {webhookResponse}
-                </pre>
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <p className="text-gray-500 italic text-lg">No AI response yet</p>
-                <p className="text-gray-400 text-sm mt-2">
-                  Click "Send API Request" to start the AI processing
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Status Information */}
-        <div className="w-full max-w-4xl text-sm text-gray-600">
-          <p><strong>How it works:</strong></p>
-          <ul className="list-disc list-inside mt-2 space-y-1">
-            <li>Click the button to send a request to the AI processing API</li>
-            <li>The API will process your request asynchronously</li>
-            <li>The AI response will be delivered to <code className="bg-gray-200 px-1 rounded">{process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000'}/api/webhook</code></li>
-            <li>This page polls for new responses every 2 seconds</li>
-            <li>The response will appear in the "AI Processing Response" section above</li>
-          </ul>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
