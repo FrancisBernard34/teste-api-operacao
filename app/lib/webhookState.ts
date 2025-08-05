@@ -20,6 +20,11 @@ export function getWebhookResponse() {
   return state;
 }
 
+export function clearWebhookResponse() {
+  state.latestResponse = null;
+  state.responseTimestamp = 0;
+}
+
 export function hasNewResponse(since: number): boolean {
   return state.responseTimestamp > since;
 }

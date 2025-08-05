@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
   const [response, setResponse] = useState<string>('');
@@ -8,66 +8,42 @@ export default function Home() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [webhookLoading, setWebhookLoading] = useState<boolean>(false);
-  const [lastPolledTimestamp, setLastPolledTimestamp] = useState<number>(0);
-  
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Function to poll for webhook responses
-  const pollForWebhookResponse = async () => {
-    try {
-      const pollResponse = await fetch(`/api/poll?since=${lastPolledTimestamp}`);
-      const data = await pollResponse.json();
-      
-      if (data.hasNew && data.response) {
-        setWebhookResponse(data.response);
-        setLastPolledTimestamp(data.timestamp);
-        setWebhookLoading(false);
-        
-        // Stop polling once we get a response
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-      }
-    } catch (error) {
-      console.error('Polling error:', error);
-    }
-  };
-
-  // Start polling for webhook responses
-  const startPolling = () => {
-    setWebhookLoading(true);
-    setWebhookResponse('');
-    setLastPolledTimestamp(Date.now());
-    
-    // Poll every 2 seconds
-    pollingIntervalRef.current = setInterval(pollForWebhookResponse, 2000);
-    
-    // Stop polling after 5 minutes
-    setTimeout(() => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-        setWebhookLoading(false);
-      }
-    }, 300000); // 5 minutes
-  };
-
-  // Clean up polling on component unmount
+  // Check for new webhook responses every few seconds
   useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (webhookLoading) {
+      interval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/webhook-status');
+          const data = await response.json();
+          
+          if (data.hasResponse) {
+            setWebhookResponse(data.response);
+            setWebhookLoading(false);
+          }
+        } catch (error) {
+          console.error('Error checking webhook status:', error);
+        }
+      }, 2000);
+    }
+
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
+      if (interval) clearInterval(interval);
     };
-  }, []);
+  }, [webhookLoading]);
 
   const callAPI = async () => {
     setLoading(true);
     setError('');
     setResponse('');
+    setWebhookResponse('');
 
     try {
+      // Clear any previous webhook response
+      await fetch('/api/webhook-clear', { method: 'POST' });
+      
       const targetHost = process.env.NEXT_PUBLIC_TARGET_HOST || 'localhost:3000';
       const webhookUrl = `${targetHost}/api/webhook`;
       
@@ -91,8 +67,8 @@ export default function Home() {
       const data = await apiResponse.text();
       setResponse(data);
       
-      // Start polling for the webhook response
-      startPolling();
+      // Start waiting for webhook response
+      setWebhookLoading(true);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
